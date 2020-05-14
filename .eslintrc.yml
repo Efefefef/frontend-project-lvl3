@@ -1,0 +1,12 @@
+---
+  plugins:
+    - import
+    - jest
+  extends:
+    - airbnb-base
+  env:
+    node: true
+    jest: true
+  rules:
+      no-console: off
+      import/extensions: off
