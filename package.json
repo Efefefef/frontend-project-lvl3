@@ -2,7 +2,7 @@
   "name": "frontend-project-lvl3",
   "version": "1.0.0",
   "description": "RSS Aggregator",
-  "main": "dist/index.js",
+  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Efefefef/frontend-project-lvl3.git"
@@ -16,16 +16,28 @@
   "keywords": [
     "rss aggregator"
   ],
-  "dependencies": {},
+  "scripts": {
+    "build": "webpack --config webpack.config.js"
+  },
+  "dependencies": {
+    "bootstrap": "^4.5.0",
+    "jquery": "^3.5.1",
+    "lodash": "^4.17.15",
+    "popper.js": "^1.16.1"
+  },
   "devDependencies": {
     "@babel/cli": "^7.8.4",
     "@babel/core": "^7.9.0",
     "@babel/preset-env": "^7.9.0",
     "babel-jest": "^25.2.4",
+    "css-loader": "^3.5.3",
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.2",
     "eslint-plugin-jest": "^23.8.2",
-    "jest": "^25.2.4"
+    "jest": "^25.2.4",
+    "style-loader": "^1.2.1",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11"
   }
 }
