@@ -1,10 +1,10 @@
 import 'bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Watchjs from 'melanke-watchjs';
 import * as yup from 'yup';
 import axios from 'axios';
 import _ from 'lodash';
 import i18next from 'i18next';
+import startWatch from './watchers';
 
 const app = async () => {
   await i18next.init({
@@ -14,7 +14,8 @@ const app = async () => {
       en: {
         translation: {
           errors: {
-            duplicateEntry: 'duplicate entry',
+            duplicateEntry: 'Duplicate entry',
+            updateNetworkError: 'Error: Update failed. Retrying...',
           },
         },
       },
@@ -25,10 +26,15 @@ const app = async () => {
     form: {
       value: '',
       error: '',
-      valid: true,
     },
     feeds: [],
     posts: [],
+  };
+
+  const elements = {
+    rssForm: document.querySelector('.rss-form'),
+    rssInput: document.querySelector('.rss-input'),
+    rssButton: document.querySelector('button[type="submit"]'),
   };
 
   const schema = yup.string().url();
@@ -45,37 +51,29 @@ const app = async () => {
     }
   };
 
-  const renderError = (elements, error) => {
-    const errorElement = elements.rssForm.nextElementSibling;
-    if (errorElement) {
-      elements.rssInput.classList.remove('is-invalid');
-      errorElement.remove();
-    }
-    if (error === '') {
-      return;
-    }
-    elements.rssInput.classList.add('is-invalid');
-    const feedbackElement = document.createElement('div');
-    feedbackElement.classList.add('feedback', 'text-danger');
-    feedbackElement.innerHTML = error;
-    elements.rssForm.after(feedbackElement);
-  };
-
-  const parse = (xml) => {
-    const domParser = new DOMParser();
-    return domParser.parseFromString(xml, 'text/xml');
-  };
-
-  const getFeed = (url) => axios.get(url)
-    .then((response) => parse(response.data));
-
   const proxify = (url) => `https://cors-anywhere.herokuapp.com/${url}`;
 
-  const elements = {
-    rssForm: document.querySelector('.rss-form'),
-    rssInput: document.querySelector('.rss-input'),
-    rssButton: document.querySelector('button[type="submit"]'),
+  const getFeed = (url) => axios.get(url);
+  const parse = (xml) => {
+    const domParser = new DOMParser();
+    const dom = domParser.parseFromString(xml, 'text/xml');
+    const title = dom.querySelector('title').textContent;
+    const description = dom.querySelector('description').textContent;
+    const feed = {
+      link: state.form.value, title, description,
+    };
+    const postsElements = dom.querySelectorAll('item');
+    const posts = [...postsElements].map((post) => {
+      const postTitle = post.querySelector('title').textContent;
+      const postLink = post.querySelector('link').textContent;
+      return {
+        title: postTitle, link: postLink,
+      };
+    });
+    return { feed, posts };
   };
+
+  const assignFeedId = (object, feedId) => ({ ...object, feedId });
 
   elements.rssInput.addEventListener('input', (e) => {
     state.form.value = e.target.value;
@@ -85,21 +83,13 @@ const app = async () => {
   elements.rssForm.addEventListener('submit', (e) => {
     e.preventDefault();
     getFeed(proxify(state.form.value))
-      .then((dom) => {
-        const title = dom.querySelector('title').textContent;
-        const description = dom.querySelector('description').textContent;
-        const postsElements = dom.querySelectorAll('item');
+      .then((response) => parse(response.data))
+      .then(({ feed, posts }) => {
         const id = _.uniqueId();
-        state.feeds.push({
-          link: state.form.value, id, title, description,
-        });
-        state.posts = [...postsElements].map((post) => {
-          const postTitle = post.querySelector('title').textContent;
-          const postLink = post.querySelector('link').textContent;
-          return {
-            title: postTitle, link: postLink, feedId: id, id: _.uniqueId(),
-          };
-        });
+        state.feeds = [...state.feeds, assignFeedId(feed, id)];
+        const postsWithId = posts.map((post) => assignFeedId(post, id));
+        state.posts = [...postsWithId, ...state.posts];
+        state.form.error = '';
       })
       .catch((error) => {
         state.form.error = error;
@@ -107,41 +97,32 @@ const app = async () => {
     elements.rssInput.value = '';
   });
 
-  const { watch } = Watchjs;
+  const checkUpdates = () => {
+    Promise.all(state.feeds.map(
+      (feed) => new Promise(((resolve) => {
+        const fetchedPostsLinks = state.posts
+          .filter((post) => post.feedId === feed.feedId)
+          .map((post) => post.link);
+        getFeed(proxify(feed.link))
+          .then((response) => parse(response.data))
+          .then(({ posts }) => {
+            const newPosts = posts.filter((post) => !fetchedPostsLinks.includes(post.link));
+            const newPostsWithIds = newPosts.map((post) => assignFeedId(post, feed.feedId));
+            state.posts = [...newPostsWithIds, ...state.posts];
+            state.form.error = '';
+            resolve();
+          })
+          .catch(() => {
+            state.form.error = i18next.t('errors.updateNetworkError');
+            resolve();
+          });
+      })),
+    ))
+      .then(() => setTimeout(checkUpdates, 5000));
+  };
 
-  watch(state.form, 'error', () => {
-    state.form.valid = state.form.error === '';
-    renderError(elements, state.form.error);
-  });
-
-  watch(state.form, 'valid', () => {
-    elements.rssButton.disabled = !state.form.valid;
-  });
-
-  watch(state, 'feeds', () => {
-    document.querySelectorAll('.text-muted').forEach((element) => element.remove());
-    state.feeds.forEach((feed) => {
-      const p = document.createElement('p');
-      p.classList.add('text-muted');
-      // p.textContent = `${feed.title} ${feed.description}`;
-      p.textContent = `${feed.link}`;
-      elements.rssForm.before(p);
-    });
-  });
-
-  watch(state, 'posts', () => {
-    const col = document.querySelector('.col');
-    document.querySelectorAll('.post').forEach((el) => el.remove());
-    state.posts.forEach((post) => {
-      const div = document.createElement('div');
-      div.classList.add('post');
-      const a = document.createElement('a');
-      a.setAttribute('href', post.link);
-      a.textContent = post.title;
-      col.appendChild(div);
-      div.appendChild(a);
-    });
-  });
+  startWatch(state, elements);
+  checkUpdates();
 };
 
 app();
