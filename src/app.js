@@ -36,6 +36,7 @@ export default async () => {
         translation: {
           errors: {
             duplicateEntry: 'Duplicate entry',
+            invalidUrl: 'this must be a valid URL',
             updateNetworkError: 'Error: Update failed. Retrying...',
           },
           loadedMessage: 'Rss has been loaded',
@@ -53,7 +54,8 @@ export default async () => {
     posts: [],
     errors: {
       validation: null,
-      network: null,
+      addition: null,
+      update: null,
     },
   };
 
@@ -66,12 +68,11 @@ export default async () => {
 
   const validate = (feeds, value) => {
     const feedLinks = feeds.map((feed) => feed.link);
-    const schema = yup.string().notOneOf(feedLinks).url();
+    const schema = yup.string().notOneOf(feedLinks, 'errors.duplicateEntry').url('errors.invalidUrl');
     try {
       schema.validateSync(value);
       return null;
     } catch (e) {
-      if (e.message.includes('this must not be one of')) return i18next.t('errors.duplicateEntry');
       return e.message;
     }
   };
@@ -82,7 +83,7 @@ export default async () => {
     state.form.value = e.target.value;
     state.errors.validation = validate(state.feeds, state.form.value);
     state.form.state = 'filling';
-    state.errors.network = null;
+    state.errors.addition = null;
   });
 
   elements.rssForm.addEventListener('submit', (e) => {
@@ -95,12 +96,12 @@ export default async () => {
         state.feeds.push(assignFeedId({ ...feed, link: state.form.value }, id));
         const postsWithId = posts.map((post) => assignFeedId(post, id));
         state.posts.unshift(...postsWithId);
-        state.errors.network = null;
+        state.errors.addition = null;
         state.form.value = '';
         state.form.state = 'completed';
       })
       .catch((error) => {
-        state.errors.network = error;
+        state.errors.addition = error;
         state.form.state = 'errored';
       });
   });
@@ -116,10 +117,10 @@ export default async () => {
           const newPosts = posts.filter((post) => !fetchedPostsLinks.includes(post.link));
           const newPostsWithIds = newPosts.map((post) => assignFeedId(post, feed.feedId));
           state.posts.unshift(...newPostsWithIds);
-          state.errors.network = null;
+          state.errors.update = null;
         })
         .catch(() => {
-          state.errors.network = i18next.t('errors.updateNetworkError');
+          state.errors.update = 'errors.updateNetworkError';
         });
     })).then(() => setTimeout(checkUpdates, 5000));
   };
