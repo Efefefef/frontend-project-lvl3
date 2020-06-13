@@ -61,13 +61,13 @@ const startWatch = (state, elements) => {
     }
   });
 
-  watch(state, 'errors', () => {
-    const errorsToRender = _.values(state.errors)
+  watch(state.form, 'errors', () => {
+    const errorsToRender = _.values(state.form.errors)
       .filter((error) => error !== null)
       .map((error) => i18next.t(error));
     renderErrors(errorsToRender);
     const { rssButton } = elements;
-    rssButton.disabled = state.errors.validation !== null;
+    rssButton.disabled = state.form.errors.validation !== null;
   });
 
   watch(state, 'feeds', () => {
