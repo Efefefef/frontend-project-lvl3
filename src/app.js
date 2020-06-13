@@ -49,14 +49,14 @@ export default async () => {
     form: {
       value: '',
       state: 'filling',
+      errors: {
+        validation: null,
+        addition: null,
+        update: null,
+      },
     },
     feeds: [],
     posts: [],
-    errors: {
-      validation: null,
-      addition: null,
-      update: null,
-    },
   };
 
   const elements = {
@@ -81,9 +81,9 @@ export default async () => {
 
   elements.rssInput.addEventListener('input', (e) => {
     state.form.value = e.target.value;
-    state.errors.validation = validate(state.feeds, state.form.value);
+    state.form.errors.validation = validate(state.feeds, state.form.value);
     state.form.state = 'filling';
-    state.errors.addition = null;
+    state.form.errors.addition = null;
   });
 
   elements.rssForm.addEventListener('submit', (e) => {
@@ -96,31 +96,30 @@ export default async () => {
         state.feeds.push(assignFeedId({ ...feed, link: state.form.value }, id));
         const postsWithId = posts.map((post) => assignFeedId(post, id));
         state.posts.unshift(...postsWithId);
-        state.errors.addition = null;
+        state.form.errors.addition = null;
         state.form.value = '';
         state.form.state = 'completed';
       })
       .catch((error) => {
-        state.errors.addition = error;
+        state.form.errors.addition = error;
         state.form.state = 'errored';
       });
   });
 
   const checkUpdates = () => {
     Promise.all(state.feeds.map((feed) => {
-      const fetchedPostsLinks = state.posts
-        .filter((post) => post.feedId === feed.feedId)
-        .map((post) => post.link);
+      const fetchedPosts = state.posts
+        .filter((post) => post.feedId === feed.feedId);
       return axios.get(proxify(feed.link))
         .then((response) => parse(response.data))
         .then(({ posts }) => {
-          const newPosts = posts.filter((post) => !fetchedPostsLinks.includes(post.link));
+          const newPosts = _.differenceBy(posts, fetchedPosts, 'link');
           const newPostsWithIds = newPosts.map((post) => assignFeedId(post, feed.feedId));
           state.posts.unshift(...newPostsWithIds);
-          state.errors.update = null;
+          state.form.errors.update = null;
         })
         .catch(() => {
-          state.errors.update = 'errors.updateNetworkError';
+          state.form.errors.update = 'errors.updateNetworkError';
         });
     })).then(() => setTimeout(checkUpdates, 5000));
   };
