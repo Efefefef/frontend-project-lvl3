@@ -3,4 +3,7 @@
 
 <h1>Rss Aggregator</h1>
 
+Parses and autoupdates rss feed aggregated from the given sources
+
 https://rss-aggregator.efefefef.now.sh
+
