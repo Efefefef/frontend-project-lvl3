@@ -21,7 +21,7 @@
     "start": "webpack-dev-server --open"
   },
   "dependencies": {
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "bootstrap": "^4.5.0",
     "i18next": "^19.4.5",
     "jquery": "^3.5.1",
